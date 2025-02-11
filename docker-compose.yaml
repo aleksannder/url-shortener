@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  url-shortener:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    hostname: url-shortener
+    container_name: url-shortener
+    ports:
+      - ${SERVER_PORT}:${SERVER_PORT}
+    depends_on:
+      - redis
+    networks:
+      - network
+    environment:
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      SERVER_PORT: ${SERVER_PORT}
+
+  redis:
+    build:
+      context: ./redis
+      dockerfile: Dockerfile
+    image: redis
+    restart: always
+    ports:
+      - ${REDIS_PORT}:${REDIS_PORT}
+    command: sh -c "./init.sh"
+    privileged: true
+    volumes:
+      - /data
+    networks:
+      - network
+
+
+networks:
+  network:
+    driver: bridge

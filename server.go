@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/aleksannder/url-shortener/domain"
 	"github.com/aleksannder/url-shortener/handlers"
 	"github.com/aleksannder/url-shortener/services"
+	"github.com/aleksannder/url-shortener/util"
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
@@ -50,7 +52,7 @@ func (s *Server) startHTTPServer(handler *handlers.UrlHandler) {
 	router.HandleFunc("/urls/{shortened-url}", handler.Redirect).Methods("GET")
 
 	srv := http.Server{
-		Addr:    "0.0.0.0:8000",
+		Addr:    fmt.Sprintf("%s:%s", "0.0.0.0", util.GetConfig().ServerPort),
 		Handler: router,
 	}
 
@@ -58,7 +60,7 @@ func (s *Server) startHTTPServer(handler *handlers.UrlHandler) {
 	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		log.Println("Starting server on :8000")
+		log.Printf("Starting server on :%s", util.GetConfig().ServerPort)
 
 		if err := srv.ListenAndServe(); err != nil {
 			if !errors.Is(err, http.ErrServerClosed) {
