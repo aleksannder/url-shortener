@@ -1,34 +1,26 @@
 package domain
 
 import (
-	"errors"
 	"fmt"
-	"github.com/go-redis/redis"
-	"log"
+	"github.com/hashicorp/consul/api"
 	"os"
 )
 
 type UrlRepository struct {
-	cli *redis.Client
+	cli *api.Client
 }
 
 func NewUrlRepository() (*UrlRepository, error) {
-	redisHost := os.Getenv("REDIS_HOST")
-	redisPort := os.Getenv("REDIS_PORT")
+	dbHost := os.Getenv("DB_HOST")
+	dbPort := os.Getenv("DB_PORT")
 
-	if redisHost == "" || redisPort == "" {
-		return nil, errors.New("database variables not correctly initiated")
+	cfg := api.DefaultConfig()
+	cfg.Address = fmt.Sprintf("%s:%s", dbHost, dbPort)
+
+	client, err := api.NewClient(cfg)
+	if err != nil {
+		return nil, err
 	}
 
-	cli := redis.NewClient(&redis.Options{
-		Addr: fmt.Sprintf("%s:%s", redisHost, redisPort),
-	})
-
-	return &UrlRepository{cli: cli}, nil
-
-}
-
-func (ur *UrlRepository) Ping() {
-	val, _ := ur.cli.Ping().Result()
-	log.Printf("Redis URL db ping info: %x", val)
+	return &UrlRepository{client}, nil
 }
