@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/aleksannder/url-shortener/domain"
 	"github.com/aleksannder/url-shortener/handlers"
 	"github.com/aleksannder/url-shortener/services"
+	"github.com/aleksannder/url-shortener/store"
 	"github.com/aleksannder/url-shortener/util"
 	"github.com/gorilla/mux"
 	"log"
@@ -21,7 +21,7 @@ type Server struct{}
 
 func (s *Server) Run() {
 	// Init repo
-	repository, err := s.initRepository()
+	repository, err := s.initCacheRepository()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -38,6 +38,19 @@ func (s *Server) Run() {
 		log.Fatal(err)
 	}
 
+	// Init consul
+	persistentRepository, err := s.initPersistentRepository()
+	if err != nil {
+		return
+	}
+
+	// Init syncer and start cron job
+	syncer := util.Sync{
+		Cache:      repository,
+		Persistent: persistentRepository,
+	}
+	syncer.Sync()
+
 	// Start HTTP Server
 	s.startHTTPServer(handler)
 }
@@ -49,7 +62,7 @@ func (s *Server) startHTTPServer(handler *handlers.UrlHandler) {
 	// Set up routing
 
 	router.HandleFunc("/urls/", handler.Insert).Methods("POST")
-	router.HandleFunc("/urls/{shortened-url}", handler.Redirect).Methods("GET")
+	router.HandleFunc("/{shortCode}", handler.Redirect).Methods("GET")
 
 	srv := http.Server{
 		Addr:    fmt.Sprintf("%s:%s", "0.0.0.0", util.GetConfig().ServerPort),
@@ -59,16 +72,7 @@ func (s *Server) startHTTPServer(handler *handlers.UrlHandler) {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
-	go func() {
-		log.Printf("Starting server on :%s", util.GetConfig().ServerPort)
-
-		if err := srv.ListenAndServe(); err != nil {
-			if !errors.Is(err, http.ErrServerClosed) {
-				log.Fatal(err)
-			}
-		}
-	}()
-
+	go s.listenAndServe(&srv)
 	<-quit
 
 	log.Println("Shutting down server...")
@@ -82,8 +86,8 @@ func (s *Server) startHTTPServer(handler *handlers.UrlHandler) {
 
 	log.Println("Server exiting")
 }
-func (s *Server) initRepository() (*domain.UrlRepository, error) {
-	urlStore, err := domain.NewUrlRepository()
+func (s *Server) initCacheRepository() (*store.UrlCacheRepository, error) {
+	urlStore, err := store.NewUrlCacheRepository()
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +95,16 @@ func (s *Server) initRepository() (*domain.UrlRepository, error) {
 	return urlStore, nil
 }
 
-func (s *Server) initService(store *domain.UrlRepository) (*services.UrlService, error) {
+func (s *Server) initPersistentRepository() (*store.UrlRepository, error) {
+	urlStore, err := store.NewUrlRepository()
+	if err != nil {
+		return nil, err
+	}
+
+	return urlStore, nil
+}
+
+func (s *Server) initService(store *store.UrlCacheRepository) (*services.UrlService, error) {
 	service, err := services.NewUrlService(store)
 	if err != nil {
 		return nil, err
@@ -107,4 +120,14 @@ func (s *Server) initHandler(service *services.UrlService) (*handlers.UrlHandler
 	}
 
 	return handler, nil
+}
+
+func (s *Server) listenAndServe(srv *http.Server) {
+	log.Printf("Starting server on :%s", util.GetConfig().ServerPort)
+
+	if err := srv.ListenAndServe(); err != nil {
+		if !errors.Is(err, http.ErrServerClosed) {
+			log.Fatal(err)
+		}
+	}
 }
