@@ -23,20 +23,8 @@ type Server struct {
 }
 
 func (s *Server) Run() {
-	// Init repo
-	repository, err := s.initCacheRepository()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Init service
-	service, err := s.initService(repository)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Init handler
-	handler, err := s.initHandler(service)
+	// Init redis
+	cacheRepository, err := s.initCacheRepository()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -47,9 +35,21 @@ func (s *Server) Run() {
 		return
 	}
 
+	// Init service
+	service, err := s.initService(cacheRepository, persistentRepository)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Init handler
+	handler, err := s.initHandler(service)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// Init syncer and start cron job
 	syncer := util.Sync{
-		Cache:      repository,
+		Cache:      cacheRepository,
 		Persistent: persistentRepository,
 	}
 	go syncer.Sync()
@@ -106,8 +106,8 @@ func (s *Server) initPersistentRepository() (*store.UrlRepository, error) {
 	return urlStore, nil
 }
 
-func (s *Server) initService(store *store.UrlCacheRepository) (*services.UrlService, error) {
-	service, err := services.NewUrlService(store)
+func (s *Server) initService(cacheStore *store.UrlCacheRepository, permStore *store.UrlRepository) (*services.UrlService, error) {
+	service, err := services.NewUrlService(cacheStore, permStore)
 	if err != nil {
 		return nil, err
 	}

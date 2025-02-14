@@ -12,14 +12,15 @@ import (
 const baseUrl = "localhost:%s"
 
 type UrlService struct {
-	repo *store.UrlCacheRepository
+	cacheRepository *store.UrlCacheRepository
+	permRepository  *store.UrlRepository
 }
 
-func NewUrlService(repo *store.UrlCacheRepository) (*UrlService, error) {
-	if repo == nil {
+func NewUrlService(repo *store.UrlCacheRepository, permRepo *store.UrlRepository) (*UrlService, error) {
+	if repo == nil || permRepo == nil {
 		return nil, errors.New("repository must be initiated")
 	}
-	return &UrlService{repo: repo}, nil
+	return &UrlService{cacheRepository: repo, permRepository: permRepo}, nil
 }
 
 func (s *UrlService) Insert(url *domain.URL) (*domain.URL, error) {
@@ -34,7 +35,7 @@ func (s *UrlService) Insert(url *domain.URL) (*domain.URL, error) {
 		return nil, err
 	}
 
-	url, err = s.repo.Insert(url)
+	url, err = s.cacheRepository.Insert(url)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +48,7 @@ func (s *UrlService) Redirect(shortLink string) (*domain.URL, error) {
 	if shortLink == "" {
 		return nil, domain.ErrShortLinkInvalid
 	}
-	result, err := s.repo.Redirect(url.ShortLink)
+	result, err := s.permRepository.Redirect(url.ShortLink)
 	if err != nil {
 		return nil, err
 	}
