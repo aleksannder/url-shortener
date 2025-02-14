@@ -7,8 +7,10 @@ services:
       dockerfile: Dockerfile
     hostname: url-shortener
     container_name: url-shortener
+    restart: always
     ports:
       - ${SERVER_PORT}:${SERVER_PORT}
+      - "2345:2345"
     depends_on:
       - redis
     networks:
@@ -17,6 +19,8 @@ services:
       REDIS_HOST: ${REDIS_HOST}
       REDIS_PORT: ${REDIS_PORT}
       SERVER_PORT: ${SERVER_PORT}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
 
   redis:
     build:

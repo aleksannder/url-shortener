@@ -3,7 +3,10 @@ package handlers
 import (
 	"errors"
 	"github.com/aleksannder/url-shortener/services"
+	"github.com/aleksannder/url-shortener/util"
+	"github.com/gorilla/mux"
 	"net/http"
+	"strings"
 )
 
 type UrlHandler struct {
@@ -19,6 +22,51 @@ func NewUrlHandler(service *services.UrlService) (*UrlHandler, error) {
 	}, nil
 }
 
-func (h *UrlHandler) Insert(w http.ResponseWriter, r *http.Request) {}
+func (h *UrlHandler) Insert(w http.ResponseWriter, r *http.Request) {
+	checkMediaType, err := util.CheckContentType(r.Header.Get("Content-Type"), "application/json")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
-func (h *UrlHandler) Redirect(w http.ResponseWriter, r *http.Request) {}
+	if !checkMediaType {
+		http.Error(w, "Content-Type must be application/json", http.StatusBadRequest)
+		return
+	}
+
+	url, err := util.DecodeBody(r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Go to service
+
+	url, err = h.service.Insert(url)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	util.RenderJSON(w, url, http.StatusCreated)
+}
+
+func (h *UrlHandler) Redirect(w http.ResponseWriter, r *http.Request) {
+	shortCode := mux.Vars(r)["shortCode"]
+	url, err := h.service.Redirect(shortCode)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if url == nil || url.URL == "" {
+		http.Error(w, "short code not found", http.StatusNotFound)
+		return
+	}
+
+	if !strings.HasPrefix(url.URL, "http://") && !strings.HasPrefix(url.URL, "https://") {
+		url.URL = "https://" + url.URL
+	}
+	http.Redirect(w, r, url.URL, http.StatusTemporaryRedirect)
+	return
+}
