@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/aleksannder/url-shortener/common"
 	"github.com/aleksannder/url-shortener/domain"
 	"github.com/go-redis/redis"
 	"log"
@@ -14,7 +15,7 @@ import (
 var ctx = context.Background()
 
 type UrlCacheRepository struct {
-	cli *redis.Client
+	Cli *redis.Client
 }
 
 func NewUrlCacheRepository() (*UrlCacheRepository, error) {
@@ -29,26 +30,39 @@ func NewUrlCacheRepository() (*UrlCacheRepository, error) {
 		Addr: fmt.Sprintf("%s:%s", redisHost, redisPort),
 	})
 
-	return &UrlCacheRepository{cli: cli}, nil
+	return &UrlCacheRepository{Cli: cli}, nil
 
 }
 
 func (ur *UrlCacheRepository) Ping() {
-	val, _ := ur.cli.Ping().Result()
+	val, _ := ur.Cli.Ping().Result()
 	log.Printf("Redis URL db ping info: %x", val)
 }
 
 func (ur *UrlCacheRepository) Insert(url *domain.URL) (*domain.URL, error) {
-	err := ur.cli.Set(url.ShortCode, url.URL, time.Hour*24).Err()
+	err := ur.Cli.Set(url.ShortCode, url.URL, time.Hour*24).Err()
 	if err != nil {
 		return nil, err
 	}
 
+	// Push to REDIS stream for sync
+
+	_, err = ur.Cli.XAdd(&redis.XAddArgs{
+		Stream: common.GetConfig().SyncStream,
+		Values: map[string]interface{}{
+			"url":       url.URL,
+			"shortCode": url.ShortCode,
+		},
+	}).Result()
+
+	if err != nil {
+		return nil, err
+	}
 	return url, nil
 }
 
 func (ur *UrlCacheRepository) Redirect(shortLink string) (*domain.URL, error) {
-	val, err := ur.cli.Get(shortLink).Result()
+	val, err := ur.Cli.Get(shortLink).Result()
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +78,7 @@ func (ur *UrlCacheRepository) GetAll() ([]domain.URL, error) {
 	for {
 		var keys []string
 		var err error
-		keys, cursor, err := ur.cli.Scan(cursor, "*", 10).Result()
+		keys, cursor, err := ur.Cli.Scan(cursor, "*", 10).Result()
 		if err != nil {
 			return nil, err
 		}
@@ -77,7 +91,7 @@ func (ur *UrlCacheRepository) GetAll() ([]domain.URL, error) {
 
 	var urls []domain.URL
 	for _, key := range resultingKeys {
-		val, err := ur.cli.Get(key).Result()
+		val, err := ur.Cli.Get(key).Result()
 		if err != nil {
 			log.Printf("Redis URL db get error: %v", err)
 		}

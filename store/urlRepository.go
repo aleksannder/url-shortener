@@ -2,11 +2,13 @@ package store
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/aleksannder/url-shortener/common"
 	"github.com/aleksannder/url-shortener/domain"
 	"github.com/hashicorp/consul/api"
 	"log"
-	"os"
+	"strings"
 )
 
 type UrlRepository struct {
@@ -14,8 +16,8 @@ type UrlRepository struct {
 }
 
 func NewUrlRepository() (*UrlRepository, error) {
-	dbHost := os.Getenv("DB_HOST")
-	dbPort := os.Getenv("DB_PORT")
+	dbHost := common.GetConfig().DbHost
+	dbPort := common.GetConfig().DbPort
 
 	log.Printf("DB HOST: %s, DB PORT: %s", dbHost, dbPort)
 	cfg := api.DefaultConfig()
@@ -44,4 +46,29 @@ func (ur *UrlRepository) Save(url *domain.URL) error {
 	}
 
 	return nil
+}
+
+func (ur *UrlRepository) Redirect(shortCode string) (*domain.URL, error) {
+	kv := ur.cli.KV()
+
+	data, _, err := kv.Get(shortCode, nil)
+	if data == nil {
+		return nil, errors.New("short code not found")
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	var url domain.URL
+	url.URL = ur.getURLFromShortCodeKV(data.Value)
+	url.ShortCode = shortCode
+	return &url, nil
+
+}
+
+func (ur *UrlRepository) getURLFromShortCodeKV(dataValue []byte) string {
+	var result string
+	result = string(dataValue)
+	result = strings.ReplaceAll(result, `"`, "")
+	return result
 }
