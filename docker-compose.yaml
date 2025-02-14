@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  url-shortener:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    hostname: url-shortener
+    container_name: url-shortener
+    restart: always
+    ports:
+      - ${SERVER_PORT}:${SERVER_PORT}
+      - "2345:2345"
+    depends_on:
+      - redis
+    networks:
+      - network
+    environment:
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      SERVER_PORT: ${SERVER_PORT}
+      SERVER_ADDRESS: ${SERVER_ADDRESS}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      SYNC_STREAM: ${SYNC_STREAM}
+      SYNC_BATCH_COUNT: ${SYNC_BATCH_COUNT}
+
+  redis:
+    build:
+      context: ./redis
+      dockerfile: Dockerfile
+    image: redis
+    restart: always
+    ports:
+      - ${REDIS_PORT}:${REDIS_PORT}
+    command: sh -c "./init.sh"
+    privileged: true
+    volumes:
+      - /data
+    networks:
+      - network
+
+  consul:
+    image: consul:1.15.4
+    ports:
+      - ${DB_PORT}:${DB_PORT}
+    command: "agent -server -data-dir=/consul/data -bootstrap=true -ui -client=0.0.0.0"
+    volumes:
+      - consul-data:/consul/data
+    networks:
+      - network
+
+volumes:
+  consul-data:
+
+networks:
+  network:
+    driver: bridge
