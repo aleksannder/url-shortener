@@ -3,10 +3,10 @@ package store
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/aleksannder/url-shortener/common"
 	"github.com/aleksannder/url-shortener/domain"
 	"github.com/hashicorp/consul/api"
 	"log"
-	"os"
 )
 
 type UrlRepository struct {
@@ -14,8 +14,8 @@ type UrlRepository struct {
 }
 
 func NewUrlRepository() (*UrlRepository, error) {
-	dbHost := os.Getenv("DB_HOST")
-	dbPort := os.Getenv("DB_PORT")
+	dbHost := common.GetConfig().DbHost
+	dbPort := common.GetConfig().DbPort
 
 	log.Printf("DB HOST: %s, DB PORT: %s", dbHost, dbPort)
 	cfg := api.DefaultConfig()

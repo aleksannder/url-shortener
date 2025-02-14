@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"fmt"
+	"github.com/aleksannder/url-shortener/common"
 	"github.com/aleksannder/url-shortener/domain"
 	"github.com/aleksannder/url-shortener/store"
 	"github.com/aleksannder/url-shortener/util"
@@ -55,7 +56,7 @@ func (s *UrlService) Redirect(shortLink string) (*domain.URL, error) {
 }
 
 func (s *UrlService) generateShortLinkFromUrl(url *domain.URL) (*domain.URL, error) {
-	baseUrl := fmt.Sprintf(baseUrl, util.GetConfig().ServerPort)
+	baseUrl := fmt.Sprintf(baseUrl, common.GetConfig().ServerPort)
 
 	originalLink := url.URL
 	shortLink := util.Encode(util.Hash(originalLink))

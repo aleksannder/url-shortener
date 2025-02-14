@@ -19,8 +19,11 @@ services:
       REDIS_HOST: ${REDIS_HOST}
       REDIS_PORT: ${REDIS_PORT}
       SERVER_PORT: ${SERVER_PORT}
+      SERVER_ADDRESS: ${SERVER_ADDRESS}
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
+      SYNC_STREAM: ${SYNC_STREAM}
+      SYNC_BATCH_COUNT: ${SYNC_BATCH_COUNT}
 
   redis:
     build:
